@@ -23,7 +23,8 @@ impl SyncBoundary {
         }
         let mut total = 0usize;
         for bytes in messages {
-            total = total.checked_add(self.envelope(bytes)?)
+            total = total
+                .checked_add(self.envelope(bytes)?)
                 .ok_or(SyncError::TooLarge)?;
             if total > MAX_ENVELOPE_BYTES {
                 return Err(SyncError::TooLarge);
@@ -43,26 +44,41 @@ impl SyncBoundary {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn boundary(enabled: bool) -> SyncBoundary {
-        SyncBoundary { store: SqliteStore::default(), enabled }
+        SyncBoundary {
+            store: SqliteStore::default(),
+            enabled,
+        }
     }
 
     #[test]
     fn batch_checks_aggregate_budget() {
         let b = boundary(true);
-        assert!(matches!(b.envelope_batch([&[0u8; 32_768][..], &[0u8; 32_769][..]]), Err(SyncError::TooLarge)));
-        assert_eq!(b.envelope_batch([&[0u8; 32_768][..], &[0u8; 32_768][..]]).unwrap(), MAX_ENVELOPE_BYTES);
-        assert!(matches!(b.envelope_batch([&[0u8; 65_537][..]]), Err(SyncError::TooLarge)));
+        assert!(matches!(
+            b.envelope_batch([&[0u8; 32_768][..], &[0u8; 32_769][..]]),
+            Err(SyncError::TooLarge)
+        ));
+        assert_eq!(
+            b.envelope_batch([&[0u8; 32_768][..], &[0u8; 32_768][..]])
+                .unwrap(),
+            MAX_ENVELOPE_BYTES
+        );
+        assert!(matches!(
+            b.envelope_batch([&[0u8; 65_537][..]]),
+            Err(SyncError::TooLarge)
+        ));
     }
 
     #[test]
     fn disabled_batch_is_denied_even_when_empty() {
         let b = boundary(false);
-        assert!(matches!(b.envelope_batch(std::iter::empty::<&[u8]>()), Err(SyncError::Disabled)));
+        assert!(matches!(
+            b.envelope_batch(std::iter::empty::<&[u8]>()),
+            Err(SyncError::Disabled)
+        ));
     }
 }
